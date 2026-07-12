@@ -22,6 +22,7 @@ set -Eeuo pipefail
 #   - common always runs
 #   - docker is optional
 #   - media automatically includes docker
+#   - technitium automatically includes docker
 #
 # Generated first-boot log:
 #   /var/log/homelab-bootstrap.log
@@ -64,6 +65,7 @@ declare -a IPCONFIG_OPTIONS=()
 declare -a SELECTED_MODULES=("common")
 
 DHCP_PRESENT="false"
+STATIC_GATEWAY_PRESENT="false"
 
 # ==============================================================================
 # Error handling and prerequisites
@@ -221,13 +223,20 @@ select_modules() {
             15 74 5 \
             "docker" "Install Docker Engine and Docker Compose" OFF \
             "media" "Install Docker plus media/NFS configuration" OFF \
+            "technitium" "Install Technitium DNS and DHCP Server" OFF \
             3>&1 1>&2 2>&3
     )" || exit 1
 
-    if grep -qw 'media' <<<"${selections}"; then
-        SELECTED_MODULES+=("docker" "media")
-    elif grep -qw 'docker' <<<"${selections}"; then
+    if grep -qwE 'docker|media|technitium' <<<"${selections}"; then
         SELECTED_MODULES+=("docker")
+    fi
+
+    if grep -qw 'media' <<<"${selections}"; then
+        SELECTED_MODULES+=("media")
+    fi
+
+    if grep -qw 'technitium' <<<"${selections}"; then
+        SELECTED_MODULES+=("technitium")
     fi
 }
 
@@ -301,6 +310,7 @@ configure_networks() {
                     validate_ipv4 "Gateway" "${gateway}"
                     ip_config+=",gw=${gateway}"
                     gateway_used="true"
+                    STATIC_GATEWAY_PRESENT="true"
                 fi
             fi
         fi
@@ -446,7 +456,8 @@ ${deploy_key}
 
       chmod +x "\${REPOSITORY_DIR}/bootstrap/"*.sh
 
-      # MODULES contains only launcher-controlled names: common, docker, media.
+      # MODULES contains only launcher-controlled names: common, docker, media,
+      # and technitium.
       # Word splitting is intentional so each module becomes one argument.
       # shellcheck disable=SC2086
       "\${REPOSITORY_DIR}/bootstrap/bootstrap.sh" \${MODULES}
@@ -603,7 +614,10 @@ main() {
     configure_networks "${nic_count}"
 
     if [[ "${DHCP_PRESENT}" == "false" ]]; then
-        nameserver="$(prompt_input "DNS Configuration" "DNS server address:" "")"
+        [[ "${STATIC_GATEWAY_PRESENT}" == "true" ]] ||
+            fatal "At least one static NIC needs a default gateway for first-boot provisioning."
+
+        nameserver="$(prompt_input "DNS Configuration" "Bootstrap DNS server address:" "1.1.1.1")"
         validate_required "DNS server" "${nameserver}"
         validate_ipv4 "DNS server" "${nameserver}"
 

@@ -172,6 +172,45 @@ prompt_input() {
     done
 }
 
+# Prompt twice for a nonempty console recovery password, then return only its
+# SHA-512 crypt hash. Plaintext exists only in transient shell variables and is
+# never printed, logged, or written to Cloud-Init user-data.
+prompt_console_password_hash() {
+    local password
+    local confirmation
+    local password_hash
+
+    while true; do
+        printf 'Console recovery password for %s: ' "${ADMIN_USER}" >/dev/tty
+        IFS= read -r -s password </dev/tty
+        printf '\n' >/dev/tty
+
+        if [[ -z "${password}" ]]; then
+            printf 'Password cannot be blank. Please try again.\n' >/dev/tty
+            continue
+        fi
+
+        printf 'Confirm console recovery password: ' >/dev/tty
+        IFS= read -r -s confirmation </dev/tty
+        printf '\n' >/dev/tty
+
+        if [[ "${password}" != "${confirmation}" ]]; then
+            printf 'Passwords do not match. Please try again.\n' >/dev/tty
+            unset password confirmation
+            continue
+        fi
+
+        password_hash="$(printf '%s' "${password}" | openssl passwd -6 -stdin)"
+        unset password confirmation
+
+        [[ -n "${password_hash}" ]] ||
+            fatal "Failed to generate the console recovery password hash."
+
+        printf '%s' "${password_hash}"
+        return
+    done
+}
+
 # Display a menu and return the selected tag. Cancel and Esc use the standard
 # launcher-exit confirmation and return to the same menu when declined.
 prompt_menu() {
@@ -590,7 +629,8 @@ yaml_authorized_keys() {
 create_user_data() {
     local hostname="$1"
     local modules="$2"
-    local output_file="$3"
+    local password_hash="$3"
+    local output_file="$4"
     local deploy_key
     local authorized_keys
 
@@ -616,6 +656,7 @@ users:
     sudo:
       - ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
+    passwd: '${password_hash}'
     ssh_authorized_keys:
 ${authorized_keys}
 
@@ -873,6 +914,7 @@ main() {
 
     require_command grep
     require_command hostname
+    require_command openssl
     require_command perl
     require_command pvesh
     require_command pvesm
@@ -900,6 +942,7 @@ main() {
     local nameserver=""
     local search_domain=""
     local modules
+    local password_hash
     local snippet_file
 
     suggested_vmid="$(get_next_vmid)"
@@ -945,6 +988,7 @@ main() {
 
     select_modules
     modules="${SELECTED_MODULES[*]}"
+    password_hash="$(prompt_console_password_hash)"
 
     show_summary \
         "${vmid}" \
@@ -966,7 +1010,8 @@ main() {
         rm -f -- "${snippet_file}"
     fi
 
-    create_user_data "${hostname}" "${modules}" "${snippet_file}"
+    create_user_data "${hostname}" "${modules}" "${password_hash}" "${snippet_file}"
+    unset password_hash
 
     create_vm \
         "${vmid}" \

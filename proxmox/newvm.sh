@@ -231,7 +231,8 @@ show_input_error() {
     whiptail \
         --title "${title}" \
         --msgbox "${message}" \
-        10 72
+        10 72 \
+        3>&1 1>&2 2>&3
 }
 
 # Prompt until a valid IPv4/CIDR value is entered.

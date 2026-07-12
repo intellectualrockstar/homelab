@@ -43,6 +43,19 @@ configure_services() {
     systemctl restart qemu-guest-agent 2>/dev/null || true
 }
 
+configure_ssh_baseline() {
+    log_info "Enforcing key-only SSH access while preserving local console login"
+
+    install -d -m 0755 /etc/ssh/sshd_config.d
+    cat >/etc/ssh/sshd_config.d/99-homelab.conf <<'EOF'
+PasswordAuthentication no
+PermitRootLogin no
+EOF
+
+    sshd -t
+    systemctl restart ssh
+}
+
 configure_aliases() {
     log_info "Installing common shell aliases"
 
@@ -70,6 +83,7 @@ main() {
     install_common_packages
     configure_timezone
     configure_services
+    configure_ssh_baseline
     disable_ufw
     configure_aliases
     cleanup_packages

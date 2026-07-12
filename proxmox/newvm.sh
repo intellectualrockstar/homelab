@@ -55,12 +55,12 @@ readonly ADMIN_USER="charles"
 readonly DEFAULT_CORES="2"
 readonly DEFAULT_MEMORY="2048"
 readonly DEFAULT_DISK_SIZE="20"
-readonly DEFAULT_BRIDGE="vmbr0"
 
 # Arguments accumulated while prompting for network interfaces.
 declare -a NETWORK_OPTIONS=()
 declare -a IPCONFIG_OPTIONS=()
 declare -a SELECTED_MODULES=()
+declare -a PROXMOX_BRIDGES=()
 
 DHCP_PRESENT="false"
 STATIC_GATEWAY_PRESENT="false"
@@ -221,6 +221,50 @@ prompt_checklist() {
 
         confirm_launcher_exit || continue
     done
+}
+
+# Load configured Linux bridges from the current Proxmox node. The API remains
+# the source of truth so bridge names are never hardcoded in the launcher.
+load_proxmox_bridges() {
+    local node_name
+
+    node_name="$(hostname -s)"
+
+    mapfile -t PROXMOX_BRIDGES < <(
+        pvesh get "/nodes/${node_name}/network" \
+            --type bridge \
+            --output-format json |
+            perl -MJSON::PP -0777 -e '
+                my $bridges = decode_json(<STDIN>);
+                my @names = sort map { $_->{iface} }
+                    grep { defined $_->{iface} && length $_->{iface} } @{$bridges};
+                print $_, "\n" for @names;
+            '
+    )
+
+    ((${#PROXMOX_BRIDGES[@]} > 0)) ||
+        fatal "No configured Proxmox bridges were found on node ${node_name}."
+}
+
+# Present configured bridges as numbered choices and return the bridge name
+# represented by the selected number.
+select_proxmox_bridge() {
+    local title="$1"
+    local selected
+    local index
+    local -a choices=()
+
+    for index in "${!PROXMOX_BRIDGES[@]}"; do
+        choices+=("$((index + 1))" "${PROXMOX_BRIDGES[index]}")
+    done
+
+    selected="$(prompt_menu \
+        "${title}" \
+        "Select a configured Proxmox bridge:" \
+        "${choices[@]}"
+    )"
+
+    printf '%s' "${PROXMOX_BRIDGES[selected - 1]}"
 }
 
 # Return the next unused VM ID reported by the Proxmox cluster.
@@ -411,8 +455,7 @@ configure_networks() {
         local net_config
         local ip_config
 
-        bridge="$(prompt_input "NIC ${nic_index}" "Proxmox bridge:" "${DEFAULT_BRIDGE}")"
-        validate_required "NIC ${nic_index} bridge" "${bridge}"
+        bridge="$(select_proxmox_bridge "NIC ${nic_index}")"
 
         vlan="$(
             prompt_input \
@@ -722,6 +765,8 @@ main() {
     require_root
 
     require_command grep
+    require_command hostname
+    require_command perl
     require_command pvesh
     require_command pvesm
     require_command qm
@@ -733,6 +778,7 @@ main() {
     require_file "${AUTHORIZED_KEYS_FILE}"
     validate_template
     validate_snippet_storage
+    load_proxmox_bridges
 
     local suggested_vmid
     local vmid

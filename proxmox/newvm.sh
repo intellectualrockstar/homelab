@@ -64,6 +64,7 @@ declare -a SELECTED_MODULES=()
 
 DHCP_PRESENT="false"
 STATIC_GATEWAY_PRESENT="false"
+readonly LAUNCHER_PID="$$"
 
 # ==============================================================================
 # Error handling and prerequisites
@@ -74,6 +75,30 @@ fatal() {
     printf 'ERROR: %s\n' "$*" >&2
     exit 1
 }
+
+# Ask before terminating the complete launcher. This function may run inside a
+# command-substitution subshell, so it signals the original launcher PID rather
+# than merely exiting the current subshell.
+confirm_launcher_exit() {
+    if whiptail \
+        --title "Cancel VM Creation" \
+        --yesno "Cancel VM creation and exit the launcher?" \
+        10 72 \
+        3>&1 1>&2 2>&3; then
+        kill -TERM "${LAUNCHER_PID}"
+        exit 130
+    fi
+
+    return 1
+}
+
+# Route Ctrl-C through the same confirmation used by dialog Cancel buttons.
+handle_interrupt() {
+    confirm_launcher_exit || true
+}
+
+trap handle_interrupt INT
+trap 'exit 130' TERM
 
 # Require execution as root because qm, snippets, and credential files need it.
 require_root() {
@@ -131,16 +156,71 @@ prompt_input() {
     local default_value="${3:-}"
     local result
 
-    result="$(
-        whiptail \
-            --title "${title}" \
-            --inputbox "${message}" \
-            10 72 \
-            "${default_value}" \
-            3>&1 1>&2 2>&3
-    )" || exit 1
+    while true; do
+        if result="$(
+            whiptail \
+                --title "${title}" \
+                --inputbox "${message}" \
+                10 72 \
+                "${default_value}" \
+                3>&1 1>&2 2>&3
+        )"; then
+            printf '%s' "${result}"
+            return
+        fi
 
-    printf '%s' "${result}"
+        confirm_launcher_exit || continue
+    done
+}
+
+# Display a menu and return the selected tag. Cancel and Esc use the standard
+# launcher-exit confirmation and return to the same menu when declined.
+prompt_menu() {
+    local title="$1"
+    local message="$2"
+    shift 2
+    local result
+
+    while true; do
+        if result="$(
+            whiptail \
+                --title "${title}" \
+                --menu "${message}" \
+                15 72 4 \
+                "$@" \
+                3>&1 1>&2 2>&3
+        )"; then
+            printf '%s' "${result}"
+            return
+        fi
+
+        confirm_launcher_exit || continue
+    done
+}
+
+# Display a checklist and return its selected tags. Cancel and Esc use the
+# standard launcher-exit confirmation and return when cancellation is declined.
+prompt_checklist() {
+    local title="$1"
+    local message="$2"
+    shift 2
+    local result
+
+    while true; do
+        if result="$(
+            whiptail \
+                --title "${title}" \
+                --checklist "${message}" \
+                15 74 5 \
+                "$@" \
+                3>&1 1>&2 2>&3
+        )"; then
+            printf '%s' "${result}"
+            return
+        fi
+
+        confirm_launcher_exit || continue
+    done
 }
 
 # Return the next unused VM ID reported by the Proxmox cluster.
@@ -296,17 +376,13 @@ Enter a valid value such as 192.168.51.1."
 select_modules() {
     local selections
 
-    selections="$(
-        whiptail \
-            --title "Bootstrap Add-ons" \
-            --checklist \
-            "Common always runs. Select optional add-ons:" \
-            15 74 5 \
-            "docker" "Install Docker Engine and Docker Compose" OFF \
-            "media" "Install Docker plus media/NFS configuration" OFF \
-            "technitium" "Install Technitium DNS and DHCP Server" OFF \
-            3>&1 1>&2 2>&3
-    )" || exit 1
+    selections="$(prompt_checklist \
+        "Bootstrap Add-ons" \
+        "Common always runs. Select optional add-ons:" \
+        "docker" "Install Docker Engine and Docker Compose" OFF \
+        "media" "Install Docker plus media/NFS configuration" OFF \
+        "technitium" "Install Technitium DNS and DHCP Server" OFF
+    )"
 
     if grep -qw 'docker' <<<"${selections}"; then
         SELECTED_MODULES+=("docker")
@@ -352,16 +428,12 @@ configure_networks() {
             net_config+=",tag=${vlan}"
         fi
 
-        mode="$(
-            whiptail \
-                --title "NIC ${nic_index} Addressing" \
-                --menu \
-                "Choose IPv4 configuration:" \
-                15 72 4 \
-                "dhcp" "Obtain an address using DHCP" \
-                "static" "Configure a static IPv4 address" \
-                3>&1 1>&2 2>&3
-        )" || exit 1
+        mode="$(prompt_menu \
+            "NIC ${nic_index} Addressing" \
+            "Choose IPv4 configuration:" \
+            "dhcp" "Obtain an address using DHCP" \
+            "static" "Configure a static IPv4 address"
+        )"
 
         if [[ "${mode}" == "dhcp" ]]; then
             ip_config="ip=dhcp"
@@ -568,10 +640,11 @@ show_summary() {
     local nic_count="$7"
     local modules="$8"
 
-    whiptail \
-        --title "Confirm VM Creation" \
-        --yesno \
-        "VM ID: ${vmid}
+    while true; do
+        if whiptail \
+            --title "Confirm VM Creation" \
+            --yesno \
+            "VM ID: ${vmid}
 Hostname: ${hostname}
 Description: ${description:-<none>}
 CPU cores: ${cores}
@@ -581,7 +654,13 @@ NICs: ${nic_count}
 Roles: ${modules:-common only}
 
 Create and start this VM?" \
-        20 76
+            20 76 \
+            3>&1 1>&2 2>&3; then
+            return 0
+        fi
+
+        confirm_launcher_exit || continue
+    done
 }
 
 # Clone the template and apply hardware, network, DNS, description, snippet,

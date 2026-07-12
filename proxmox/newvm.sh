@@ -376,7 +376,7 @@ users:
     shell: /bin/bash
     sudo:
       - ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
+    lock_passwd: false
     ssh_authorized_keys:
 ${authorized_keys}
 

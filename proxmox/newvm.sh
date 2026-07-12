@@ -18,11 +18,9 @@ set -Eeuo pipefail
 #   - /etc/homelab-vm/deploy_key (read-only GitHub deploy private key)
 #   - /etc/homelab-vm/authorized_keys (one or more SSH public keys)
 #
-# Bootstrap rules:
-#   - common always runs
-#   - docker is optional
-#   - media automatically includes docker
-#   - technitium automatically includes docker
+# Bootstrap handoff:
+#   - newvm passes selected roles to the Git-backed dispatcher
+#   - bootstrap/bootstrap.sh always runs common and resolves dependencies
 #
 # Generated first-boot log:
 #   /var/log/homelab-bootstrap.log
@@ -62,7 +60,7 @@ readonly DEFAULT_BRIDGE="vmbr0"
 # Arguments accumulated while prompting for network interfaces.
 declare -a NETWORK_OPTIONS=()
 declare -a IPCONFIG_OPTIONS=()
-declare -a SELECTED_MODULES=("common")
+declare -a SELECTED_MODULES=()
 
 DHCP_PRESENT="false"
 STATIC_GATEWAY_PRESENT="false"
@@ -210,8 +208,8 @@ validate_ipv4() {
 # Module and network selection
 # ==============================================================================
 
-# Ask which optional bootstrap capabilities should run. Common is mandatory.
-# Selecting media automatically inserts docker before media.
+# Ask which optional roles the Git-backed bootstrap dispatcher should run.
+# Dependency ordering and the mandatory common baseline are resolved in Git.
 select_modules() {
     local selections
 
@@ -227,7 +225,7 @@ select_modules() {
             3>&1 1>&2 2>&3
     )" || exit 1
 
-    if grep -qwE 'docker|media|technitium' <<<"${selections}"; then
+    if grep -qw 'docker' <<<"${selections}"; then
         SELECTED_MODULES+=("docker")
     fi
 
@@ -456,9 +454,9 @@ ${deploy_key}
 
       chmod +x "\${REPOSITORY_DIR}/bootstrap/"*.sh
 
-      # MODULES contains only launcher-controlled names: common, docker, media,
-      # and technitium.
-      # Word splitting is intentional so each module becomes one argument.
+      # MODULES contains only launcher-selected role names. The Git-backed
+      # dispatcher adds common and resolves role dependencies.
+      # Word splitting is intentional so each role becomes one argument.
       # shellcheck disable=SC2086
       "\${REPOSITORY_DIR}/bootstrap/bootstrap.sh" \${MODULES}
 
@@ -470,7 +468,7 @@ runcmd:
 
 final_message: |
   Cloud-Init completed after \$UPTIME seconds.
-  Homelab modules: ${modules}
+  Homelab requested roles: ${modules:-common only}
 EOF
 
     chmod 0600 "${output_file}"
@@ -501,7 +499,7 @@ CPU cores: ${cores}
 Memory: ${memory} MB
 Disk: ${disk_size} GB
 NICs: ${nic_count}
-Modules: ${modules}
+Roles: ${modules:-common only}
 
 Create and start this VM?" \
         20 76
@@ -660,7 +658,7 @@ main() {
 
     printf '\nVM %s (%s) was created and started.\n' "${vmid}" "${hostname}"
     printf 'Cloud-Init snippet: %s\n' "${snippet_file}"
-    printf 'Selected modules: %s\n' "${modules}"
+    printf 'Requested roles: %s\n' "${modules:-common only}"
     printf 'First-boot log: /var/log/homelab-bootstrap.log\n'
     printf '\nUse the Proxmox console or run: qm terminal %s\n' "${vmid}"
 }

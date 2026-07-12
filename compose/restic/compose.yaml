@@ -1,18 +1,4 @@
 services:
-  restic-server:
-    container_name: restic-server
-    hostname: restic-server
-    image: docker.io/restic/rest-server:latest
-    user: "1001:1001"
-    ports:
-      - "192.168.10.25:8000:8000"
-    environment:
-      DISABLE_AUTHENTICATION: "true"
-      OPTIONS: "--append-only"
-    volumes:
-      - restic-data:/data
-    restart: unless-stopped
-
   backrest:
     container_name: backrest
     hostname: backrest
@@ -27,16 +13,16 @@ services:
       TMPDIR: /tmp
       TZ: America/New_York
     volumes:
+      - restic-data:/repo
       - backrest-data:/data
       - backrest-config:/config
       - backrest-cache:/cache
       - backrest-tmp:/tmp
-    depends_on:
-      - restic-server
     restart: unless-stopped
 
 volumes:
   restic-data:
+    name: restic-data
     driver: local
     driver_opts:
       type: nfs
@@ -44,6 +30,10 @@ volumes:
       device: ":/mnt/MediaStorage/Backups"
 
   backrest-data:
+    name: backrest-data
   backrest-config:
+    name: backrest-config
   backrest-cache:
+    name: backrest-cache
   backrest-tmp:
+    name: backrest-tmp

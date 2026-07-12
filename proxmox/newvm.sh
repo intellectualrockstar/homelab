@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+shopt -s inherit_errexit
 
 # ==============================================================================
 # Homelab Proxmox VM Launcher
@@ -64,7 +65,6 @@ declare -a PROXMOX_BRIDGES=()
 
 DHCP_PRESENT="false"
 STATIC_GATEWAY_PRESENT="false"
-readonly LAUNCHER_PID="$$"
 
 # ==============================================================================
 # Error handling and prerequisites
@@ -76,29 +76,23 @@ fatal() {
     exit 1
 }
 
-# Ask before terminating the complete launcher. This function may run inside a
-# command-substitution subshell, so it signals the original launcher PID rather
-# than merely exiting the current subshell.
+# Ask whether the user wants to terminate the complete launcher.
 confirm_launcher_exit() {
-    if whiptail \
+    whiptail \
         --title "Cancel VM Creation" \
         --yesno "Cancel VM creation and exit the launcher?" \
         10 72 \
-        3>&1 1>&2 2>&3; then
-        kill -TERM "${LAUNCHER_PID}"
-        exit 130
-    fi
-
-    return 1
+        3>&1 1>&2 2>&3
 }
 
 # Route Ctrl-C through the same confirmation used by dialog Cancel buttons.
 handle_interrupt() {
-    confirm_launcher_exit || true
+    if confirm_launcher_exit; then
+        exit 130
+    fi
 }
 
 trap handle_interrupt INT
-trap 'exit 130' TERM
 
 # Require execution as root because qm, snippets, and credential files need it.
 require_root() {
@@ -169,7 +163,9 @@ prompt_input() {
             return
         fi
 
-        confirm_launcher_exit || continue
+        if confirm_launcher_exit; then
+            return 130
+        fi
     done
 }
 
@@ -194,7 +190,9 @@ prompt_menu() {
             return
         fi
 
-        confirm_launcher_exit || continue
+        if confirm_launcher_exit; then
+            return 130
+        fi
     done
 }
 
@@ -219,7 +217,9 @@ prompt_checklist() {
             return
         fi
 
-        confirm_launcher_exit || continue
+        if confirm_launcher_exit; then
+            return 130
+        fi
     done
 }
 
@@ -702,7 +702,9 @@ Create and start this VM?" \
             return 0
         fi
 
-        confirm_launcher_exit || continue
+        if confirm_launcher_exit; then
+            return 130
+        fi
     done
 }
 

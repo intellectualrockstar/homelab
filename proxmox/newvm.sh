@@ -305,12 +305,43 @@ validate_hostname() {
         fatal "Hostname contains invalid characters."
 }
 
-# Validate an optional IEEE 802.1Q VLAN tag.
+# Validate an IEEE 802.1Q VLAN tag without terminating the launcher.
 validate_vlan() {
     local vlan="$1"
 
-    [[ "${vlan}" =~ ^[0-9]+$ ]] || fatal "VLAN tag must be a whole number."
-    ((vlan >= 1 && vlan <= 4094)) || fatal "VLAN tag must be between 1 and 4094."
+    [[ "${vlan}" =~ ^[0-9]+$ ]] || return 1
+    ((10#${vlan} >= 1 && 10#${vlan} <= 4094))
+}
+
+# Prompt until a valid optional VLAN tag is entered. Blank remains the
+# existing way to request an untagged interface.
+prompt_vlan() {
+    local title="$1"
+    local value
+
+    while true; do
+        value="$(prompt_input \
+            "${title}" \
+            "Optional VLAN tag. Leave blank for untagged:" \
+            ""
+        )"
+
+        if [[ -z "${value}" ]]; then
+            printf '%s' ""
+            return
+        fi
+
+        if validate_vlan "${value}"; then
+            printf '%s' "${value}"
+            return
+        fi
+
+        show_input_error \
+            "${title}" \
+            "Invalid VLAN tag: ${value}
+
+Enter a whole number from 1 through 4094, or leave blank for untagged."
+    done
 }
 
 # Validate an IPv4 address, including the valid range of each octet.
@@ -460,12 +491,7 @@ configure_networks() {
 
         bridge="$(select_proxmox_bridge "NIC ${nic_index}")"
 
-        vlan="$(
-            prompt_input \
-                "NIC ${nic_index}" \
-                "Optional VLAN tag. Leave blank for untagged:" \
-                ""
-        )"
+        vlan="$(prompt_vlan "NIC ${nic_index}")"
 
         net_config="virtio,bridge=${bridge},firewall=0"
 

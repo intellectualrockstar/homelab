@@ -701,7 +701,7 @@ schedule_snippet_cleanup() {
             for ((attempt = 1; attempt <= max_attempts; attempt++)); do
                 guest_result="$(qm guest exec "${vmid}" -- test -f "${marker}" 2>/dev/null || true)"
 
-                if grep -Eq '"'"'"?exitcode"'"'"?[[:space:]]*:[[:space:]]*0' <<<"${guest_result}"; then
+                if grep -Eq "exitcode[[:space:]]*:[[:space:]]*0" <<<"${guest_result}"; then
                     if qm set "${vmid}" --delete cicustom &&
                         qm cloudinit update "${vmid}" &&
                         rm -f -- "${snippet_file}"; then

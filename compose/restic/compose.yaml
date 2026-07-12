@@ -1,0 +1,43 @@
+services:
+  rest-server:
+    image: docker.io/restic/rest-server:latest
+    container_name: restic-server
+    hostname: restic-server
+    user: "${PUID:-1001}:${PGID:-1001}"
+    ports:
+      - "${REST_SERVER_PORT:-8000}:8000"
+    environment:
+      OPTIONS: "${REST_SERVER_OPTIONS:---append-only --private-repos}"
+      PASSWORD_FILE: /data/.htpasswd
+    volumes:
+      - restic_repository:/data
+    restart: unless-stopped
+
+  restic:
+    image: docker.io/restic/restic:latest
+    hostname: "${RESTIC_HOSTNAME:-backup}"
+    environment:
+      RESTIC_REPOSITORY: "rest:http://rest-server:8000/${RESTIC_REPOSITORY_NAME:-backup}"
+      RESTIC_REST_USERNAME: "${RESTIC_REST_USERNAME}"
+      RESTIC_REST_PASSWORD: "${RESTIC_REST_PASSWORD}"
+      RESTIC_PASSWORD: "${RESTIC_PASSWORD}"
+      RESTIC_CACHE_DIR: /cache
+    volumes:
+      - restic_cache:/cache
+    depends_on:
+      - rest-server
+    profiles:
+      - tools
+    restart: "no"
+
+volumes:
+  restic_repository:
+    name: restic_repository
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.10.8,nfsvers=4,rw,hard"
+      device: ":/mnt/MediaStorage/Backups"
+
+  restic_cache:
+    name: restic_cache

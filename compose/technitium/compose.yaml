@@ -6,6 +6,9 @@ services:
     network_mode: host
     environment:
       DNS_SERVER_DOMAIN: dns-server
+      DNS_SERVER_PREFER_IPV6: "true"
+      DNS_SERVER_WEB_SERVICE_HTTP_PORT: "5380"
+      DNS_SERVER_LOG_USING_LOCAL_TIME: "true"
       DNS_SERVER_LOG_FOLDER_PATH: /var/log/technitium/dns
     volumes:
       - ./config:/etc/dns

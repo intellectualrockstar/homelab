@@ -186,22 +186,104 @@ validate_vlan() {
     ((vlan >= 1 && vlan <= 4094)) || fatal "VLAN tag must be between 1 and 4094."
 }
 
-# Perform a pragmatic IPv4/CIDR format check. Cloud-Init and Proxmox perform
-# final semantic validation when applying the generated configuration.
-validate_ipv4_cidr() {
+# Validate an IPv4 address, including the valid range of each octet.
+validate_ipv4_address() {
     local address="$1"
+    local octet
+    local -a octets
 
-    [[ "${address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$ ]] ||
-        fatal "Static address must be IPv4/CIDR, for example 192.168.51.20/24."
+    [[ "${address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+
+    IFS='.' read -r -a octets <<<"${address}"
+
+    for octet in "${octets[@]}"; do
+        ((10#${octet} >= 0 && 10#${octet} <= 255)) || return 1
+    done
 }
 
-# Perform a pragmatic IPv4 address check for gateways and DNS servers.
-validate_ipv4() {
-    local label="$1"
-    local address="$2"
+# Validate an IPv4 address followed by a CIDR prefix from 0 through 32.
+validate_ipv4_cidr() {
+    local value="$1"
+    local address
+    local prefix
 
-    [[ "${address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] ||
-        fatal "${label} must be an IPv4 address."
+    [[ "${value}" == */* ]] || return 1
+
+    address="${value%/*}"
+    prefix="${value##*/}"
+
+    validate_ipv4_address "${address}" || return 1
+    [[ "${prefix}" =~ ^([0-9]|[12][0-9]|3[0-2])$ ]]
+}
+
+# Validate a gateway or DNS server IPv4 address.
+validate_ipv4() {
+    local address="$1"
+
+    validate_ipv4_address "${address}"
+}
+
+# Display an input-validation error without terminating the launcher.
+show_input_error() {
+    local title="$1"
+    local message="$2"
+
+    whiptail \
+        --title "${title}" \
+        --msgbox "${message}" \
+        10 72
+}
+
+# Prompt until a valid IPv4/CIDR value is entered.
+prompt_ipv4_cidr() {
+    local title="$1"
+    local message="$2"
+    local value
+
+    while true; do
+        value="$(prompt_input "${title}" "${message}" "")"
+
+        if validate_ipv4_cidr "${value}"; then
+            printf '%s' "${value}"
+            return
+        fi
+
+        show_input_error \
+            "${title}" \
+            "Invalid IPv4/CIDR address: ${value:-<blank>}
+
+Enter a valid value such as 192.168.51.20/24."
+    done
+}
+
+# Prompt until a valid IPv4 address is entered. When allow_blank is true, an
+# empty value is accepted for optional fields such as a secondary NIC gateway.
+prompt_ipv4() {
+    local title="$1"
+    local message="$2"
+    local default_value="${3:-}"
+    local allow_blank="${4:-false}"
+    local value
+
+    while true; do
+        value="$(prompt_input "${title}" "${message}" "${default_value}")"
+
+        if [[ -z "${value}" && "${allow_blank}" == "true" ]]; then
+            printf '%s' ""
+            return
+        fi
+
+        if validate_ipv4 "${value}"; then
+            printf '%s' "${value}"
+            return
+        fi
+
+        show_input_error \
+            "${title}" \
+            "Invalid IPv4 address: ${value:-<blank>}
+
+Enter a valid value such as 192.168.51.1."
+    done
 }
 
 # ==============================================================================
@@ -287,25 +369,21 @@ configure_networks() {
             local address
             local gateway=""
 
-            address="$(
-                prompt_input \
+            address="$(prompt_ipv4_cidr \
                     "NIC ${nic_index}" \
-                    "IPv4 address with CIDR (example: 192.168.51.20/24):" \
-                    ""
+                    "IPv4 address with CIDR (example: 192.168.51.20/24):"
             )"
-            validate_ipv4_cidr "${address}"
             ip_config="ip=${address}"
 
             if [[ "${gateway_used}" == "false" ]]; then
-                gateway="$(
-                    prompt_input \
+                gateway="$(prompt_ipv4 \
                         "NIC ${nic_index}" \
                         "Default gateway. Leave blank for no default route:" \
-                        ""
+                        "" \
+                        true
                 )"
 
                 if [[ -n "${gateway}" ]]; then
-                    validate_ipv4 "Gateway" "${gateway}"
                     ip_config+=",gw=${gateway}"
                     gateway_used="true"
                     STATIC_GATEWAY_PRESENT="true"
@@ -615,9 +693,12 @@ main() {
         [[ "${STATIC_GATEWAY_PRESENT}" == "true" ]] ||
             fatal "At least one static NIC needs a default gateway for first-boot provisioning."
 
-        nameserver="$(prompt_input "DNS Configuration" "Bootstrap DNS server address:" "1.1.1.1")"
-        validate_required "DNS server" "${nameserver}"
-        validate_ipv4 "DNS server" "${nameserver}"
+        nameserver="$(prompt_ipv4 \
+            "DNS Configuration" \
+            "Bootstrap DNS server address:" \
+            "1.1.1.1" \
+            false
+        )"
 
         search_domain="$(
             prompt_input \

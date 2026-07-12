@@ -1,0 +1,13 @@
+services:
+  dns-server:
+    container_name: dns-server
+    hostname: dns-server
+    image: docker.io/technitium/dns-server:latest
+    network_mode: host
+    environment:
+      DNS_SERVER_DOMAIN: dns-server
+      DNS_SERVER_LOG_FOLDER_PATH: /var/log/technitium/dns
+    volumes:
+      - ./config:/etc/dns
+      - ./logs:/var/log/technitium/dns
+    restart: unless-stopped

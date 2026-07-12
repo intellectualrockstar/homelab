@@ -32,7 +32,7 @@ apt_install() {
 
 disable_ufw() {
     if command_exists ufw; then
-        log_info "Disabling UFW"
+        log_info "Disabling Ubuntu UFW firewall"
         ufw --force disable || true
         systemctl disable --now ufw 2>/dev/null || true
     fi

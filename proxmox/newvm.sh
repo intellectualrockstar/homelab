@@ -770,6 +770,9 @@ schedule_snippet_cleanup() {
     local snippet_file="$2"
     local unit_name="homelab-snippet-cleanup-${vmid}"
 
+    # Variables inside the single-quoted command are intentionally expanded by
+    # the nested shell after systemd-run passes the positional arguments.
+    # shellcheck disable=SC2016
     systemd-run \
         --unit="${unit_name}" \
         --collect \

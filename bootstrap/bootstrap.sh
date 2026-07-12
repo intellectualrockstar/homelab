@@ -13,10 +13,10 @@ run_module() {
     local module_path="${SCRIPT_DIR}/${module}.sh"
 
     [[ -f "${module_path}" ]] || die "Unknown module: ${module}"
-    [[ -x "${module_path}" ]] || die "Module is not executable: ${module_path}"
+    [[ -r "${module_path}" ]] || die "Module is not readable: ${module_path}"
 
     log_info "Running module: ${module}"
-    "${module_path}"
+    bash "${module_path}"
 }
 
 main() {

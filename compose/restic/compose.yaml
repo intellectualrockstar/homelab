@@ -20,6 +20,20 @@ services:
       - backrest-tmp:/tmp
     restart: unless-stopped
 
+  restic-server:
+    container_name: restic-server
+    hostname: restic-server
+    image: docker.io/restic/rest-server:latest
+    user: "1001:1001"
+    ports:
+      - "192.168.51.25:8000:8000"
+    environment:
+      DISABLE_AUTHENTICATION: "true"
+      OPTIONS: "--append-only"
+    volumes:
+      - restic-data:/data
+    restart: unless-stopped
+
 volumes:
   restic-data:
     name: restic-data

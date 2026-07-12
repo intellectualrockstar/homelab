@@ -36,6 +36,9 @@ readonly DEFAULT_STORAGE="local-lvm"
 readonly SNIPPET_STORAGE="local"
 readonly SNIPPET_DIRECTORY="/var/lib/vz/snippets"
 readonly OS_DISK="scsi0"
+readonly BOOTSTRAP_COMPLETE_MARKER="/var/lib/homelab-bootstrap-complete"
+readonly SNIPPET_CLEANUP_ATTEMPTS="180"
+readonly SNIPPET_CLEANUP_INTERVAL="10"
 
 # ------------------------------------------------------------------------------
 # Credentials and bootstrap configuration
@@ -669,6 +672,64 @@ EOF
 }
 
 # ==============================================================================
+# Temporary snippet lifecycle
+# ==============================================================================
+
+# Start a transient host-side cleanup unit after the VM boots. The unit waits
+# for the existing guest bootstrap marker through QEMU Guest Agent. Successful
+# provisioning detaches the custom user-data, regenerates the Cloud-Init drive,
+# and removes the temporary snippet. Failed or timed-out builds retain their
+# snippet for troubleshooting.
+schedule_snippet_cleanup() {
+    local vmid="$1"
+    local snippet_file="$2"
+    local unit_name="homelab-snippet-cleanup-${vmid}"
+
+    systemd-run \
+        --unit="${unit_name}" \
+        --collect \
+        --property=Type=exec \
+        /bin/bash -c '
+            set -u
+
+            readonly vmid="$1"
+            readonly snippet_file="$2"
+            readonly marker="$3"
+            readonly max_attempts="$4"
+            readonly interval="$5"
+
+            for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+                guest_result="$(qm guest exec "${vmid}" -- test -f "${marker}" 2>/dev/null || true)"
+
+                if grep -Eq '"'"'"?exitcode"'"'"?[[:space:]]*:[[:space:]]*0' <<<"${guest_result}"; then
+                    if qm set "${vmid}" --delete cicustom &&
+                        qm cloudinit update "${vmid}" &&
+                        rm -f -- "${snippet_file}"; then
+                        logger -t homelab-newvm \
+                            "Removed temporary Cloud-Init snippet for VM ${vmid}."
+                        exit 0
+                    fi
+
+                    logger -t homelab-newvm \
+                        "Cleanup failed for VM ${vmid}; preserving ${snippet_file}."
+                    exit 1
+                fi
+
+                sleep "${interval}"
+            done
+
+            logger -t homelab-newvm \
+                "VM ${vmid} did not report successful provisioning; preserving ${snippet_file}."
+            exit 1
+        ' _ \
+        "${vmid}" \
+        "${snippet_file}" \
+        "${BOOTSTRAP_COMPLETE_MARKER}" \
+        "${SNIPPET_CLEANUP_ATTEMPTS}" \
+        "${SNIPPET_CLEANUP_INTERVAL}" >/dev/null
+}
+
+# ==============================================================================
 # Confirmation and VM creation
 # ==============================================================================
 
@@ -773,6 +834,7 @@ main() {
     require_command pvesm
     require_command qm
     require_command sed
+    require_command systemd-run
     require_command tee
     require_command whiptail
 
@@ -850,7 +912,14 @@ main() {
         "${modules}" || exit 0
 
     snippet_file="${SNIPPET_DIRECTORY}/homelab-vm-${vmid}.yaml"
-    [[ ! -e "${snippet_file}" ]] || fatal "Snippet already exists: ${snippet_file}"
+
+    # The VMID was already proven unused, so an existing matching snippet is a
+    # stale artifact from a previously deleted or failed VM and is safe to
+    # replace. Failed builds from this run remain available for troubleshooting.
+    if [[ -e "${snippet_file}" ]]; then
+        printf 'Removing stale Cloud-Init snippet: %s\n' "${snippet_file}"
+        rm -f -- "${snippet_file}"
+    fi
 
     create_user_data "${hostname}" "${modules}" "${snippet_file}"
 
@@ -864,6 +933,8 @@ main() {
         "${nameserver}" \
         "${search_domain}" \
         "${snippet_file}"
+
+    schedule_snippet_cleanup "${vmid}" "${snippet_file}"
 
     printf '\nVM %s (%s) was created and started.\n' "${vmid}" "${hostname}"
     printf 'Cloud-Init snippet: %s\n' "${snippet_file}"

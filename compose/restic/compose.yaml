@@ -13,6 +13,28 @@ services:
       - restic-data:/data
     restart: unless-stopped
 
+  backrest:
+    container_name: backrest
+    hostname: backrest
+    image: ghcr.io/garethgeorge/backrest:latest
+    ports:
+      - "192.168.51.25:9898:9898"
+    environment:
+      BACKREST_PORT: 0.0.0.0:9898
+      BACKREST_DATA: /data
+      BACKREST_CONFIG: /config/config.json
+      XDG_CACHE_HOME: /cache
+      TMPDIR: /tmp
+      TZ: America/New_York
+    volumes:
+      - backrest-data:/data
+      - backrest-config:/config
+      - backrest-cache:/cache
+      - backrest-tmp:/tmp
+    depends_on:
+      - restic-server
+    restart: unless-stopped
+
 volumes:
   restic-data:
     driver: local
@@ -20,3 +42,8 @@ volumes:
       type: nfs
       o: addr=192.168.10.8,nfsvers=4,rw,hard
       device: ":/mnt/MediaStorage/Backups"
+
+  backrest-data:
+  backrest-config:
+  backrest-cache:
+  backrest-tmp:

@@ -8,6 +8,47 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/lib/logging.sh"
 source "${REPO_ROOT}/lib/functions.sh"
 
+declare -a RESOLVED_MODULES=()
+
+append_module() {
+    local module="$1"
+    local existing
+
+    for existing in "${RESOLVED_MODULES[@]}"; do
+        [[ "${existing}" == "${module}" ]] && return
+    done
+
+    RESOLVED_MODULES+=("${module}")
+}
+
+resolve_modules() {
+    local requested_module
+
+    # Every homelab VM receives the common baseline.
+    append_module "common"
+
+    for requested_module in "$@"; do
+        case "${requested_module}" in
+            common)
+                ;;
+            docker)
+                append_module "docker"
+                ;;
+            media)
+                append_module "docker"
+                append_module "media"
+                ;;
+            technitium)
+                append_module "docker"
+                append_module "technitium"
+                ;;
+            *)
+                die "Unknown module: ${requested_module}"
+                ;;
+        esac
+    done
+}
+
 run_module() {
     local module="$1"
     local module_path="${SCRIPT_DIR}/${module}.sh"
@@ -20,13 +61,12 @@ run_module() {
 }
 
 main() {
+    local module
+
     require_root
+    resolve_modules "$@"
 
-    if [[ $# -eq 0 ]]; then
-        die "Usage: bootstrap.sh <module> [module ...]"
-    fi
-
-    for module in "$@"; do
+    for module in "${RESOLVED_MODULES[@]}"; do
         run_module "${module}"
     done
 

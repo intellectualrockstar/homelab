@@ -57,7 +57,7 @@ readonly ADMIN_USER="charles"
 # ------------------------------------------------------------------------------
 
 readonly DEFAULT_CORES="2"
-readonly DEFAULT_MEMORY="2048"
+readonly DEFAULT_MEMORY_GB="2"
 readonly DEFAULT_DISK_SIZE="20"
 
 # Arguments accumulated while prompting for network interfaces.
@@ -294,6 +294,24 @@ validate_positive_integer() {
 
     [[ "${value}" =~ ^[1-9][0-9]*$ ]] ||
         fatal "${label} must be a positive whole number."
+}
+
+# Prompt until a positive whole-number memory value in GB is entered.
+prompt_memory_gb() {
+    local value
+
+    while true; do
+        value="$(prompt_input "New VM" "Memory in GB:" "${DEFAULT_MEMORY_GB}")"
+
+        if [[ "${value}" =~ ^[1-9][0-9]*$ ]]; then
+            printf '%s' "${value}"
+            return
+        fi
+
+        show_input_error \
+            "New VM" \
+            "Invalid memory value: ${value:-<blank>}\n\nEnter a positive whole number of GB, such as 8, 16, or 64."
+    done
 }
 
 # Require a legal Proxmox/Linux hostname.
@@ -778,7 +796,7 @@ show_summary() {
 Hostname: ${hostname}
 Description: ${description:-<none>}
 CPU cores: ${cores}
-Memory: ${memory} MB
+Memory: $((memory / 1024)) GB (${memory} MB)
 Disk: ${disk_size} GB
 NICs: ${nic_count}
 Roles: ${modules:-common only}
@@ -875,6 +893,7 @@ main() {
     local hostname
     local description
     local cores
+    local memory_gb
     local memory
     local disk_size
     local nic_count
@@ -889,7 +908,8 @@ main() {
     hostname="$(prompt_input "New VM" "Hostname:" "")"
     description="$(prompt_input "New VM" "Optional Proxmox description:" "")"
     cores="$(prompt_input "New VM" "CPU cores:" "${DEFAULT_CORES}")"
-    memory="$(prompt_input "New VM" "Memory in MB:" "${DEFAULT_MEMORY}")"
+    memory_gb="$(prompt_memory_gb)"
+    memory="$((memory_gb * 1024))"
     disk_size="$(prompt_input "New VM" "OS disk size in GB:" "${DEFAULT_DISK_SIZE}")"
     nic_count="$(prompt_input "New VM" "Number of network adapters:" "1")"
 
@@ -897,7 +917,6 @@ main() {
     validate_required "Hostname" "${hostname}"
     validate_hostname "${hostname}"
     validate_positive_integer "CPU cores" "${cores}"
-    validate_positive_integer "Memory" "${memory}"
     validate_positive_integer "Disk size" "${disk_size}"
     validate_positive_integer "NIC count" "${nic_count}"
 

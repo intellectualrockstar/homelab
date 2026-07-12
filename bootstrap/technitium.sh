@@ -11,9 +11,10 @@ source "${REPO_ROOT}/lib/logging.sh"
 # shellcheck source=../lib/functions.sh
 source "${REPO_ROOT}/lib/functions.sh"
 
-readonly TECHNITIUM_ROOT="${DOCKER_ROOT}/technitium"
 readonly COMPOSE_SOURCE="${REPO_ROOT}/compose/technitium/compose.yaml"
-readonly COMPOSE_TARGET="${TECHNITIUM_ROOT}/compose.yaml"
+
+TECHNITIUM_ROOT=""
+COMPOSE_TARGET=""
 
 require_docker() {
     command_exists docker || die "Docker is required. Run the docker module before technitium."
@@ -61,6 +62,9 @@ verify_technitium() {
 main() {
     require_root
     load_config "${REPO_ROOT}"
+
+    TECHNITIUM_ROOT="${DOCKER_ROOT}/technitium"
+    COMPOSE_TARGET="${TECHNITIUM_ROOT}/compose.yaml"
 
     log_info "Starting Technitium bootstrap"
 

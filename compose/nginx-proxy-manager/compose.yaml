@@ -7,11 +7,15 @@ services:
       - "80:80"
       - "81:81"
       - "443:443"
+    environment:
+      TZ: America/New_York
     volumes:
-      - data:/data
-      - letsencrypt:/etc/letsencrypt
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
     restart: unless-stopped
 
 volumes:
-  data:
-  letsencrypt:
+  npm_data:
+    name: npm_data
+  npm_letsencrypt:
+    name: npm_letsencrypt

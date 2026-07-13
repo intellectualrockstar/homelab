@@ -1,0 +1,25 @@
+services:
+  plex:
+    container_name: plex
+    image: plexinc/pms-docker:latest
+    restart: unless-stopped
+
+    environment:
+      - TZ=America/New_York
+      - PLEX_UID=1001
+      - PLEX_GID=1001
+
+    network_mode: host
+
+    volumes:
+      - ./config:/config
+      - /dev/shm:/transcode
+      - PlexLibrary:/mnt/MediaLibrary:ro
+
+volumes:
+  PlexLibrary:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.10.8,nolock,soft
+      device: ":/mnt/MediaStorage/PlexLibrary"

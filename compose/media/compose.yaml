@@ -6,8 +6,8 @@ services:
     ports:
       - "8989:8989"
     environment:
-      PUID: "1000"
-      PGID: "1000"
+      PUID: "1001"
+      PGID: "1001"
       TZ: America/New_York
     volumes:
       - ./sonarr:/config
@@ -22,8 +22,8 @@ services:
     ports:
       - "7878:7878"
     environment:
-      PUID: "1000"
-      PGID: "1000"
+      PUID: "1001"
+      PGID: "1001"
       TZ: America/New_York
     volumes:
       - ./radarr:/config
@@ -38,8 +38,8 @@ services:
     ports:
       - "9696:9696"
     environment:
-      PUID: "1000"
-      PGID: "1000"
+      PUID: "1001"
+      PGID: "1001"
       TZ: America/New_York
     volumes:
       - ./prowlarr:/config
@@ -52,8 +52,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PUID: "1000"
-      PGID: "1000"
+      PUID: "1001"
+      PGID: "1001"
       TZ: America/New_York
     volumes:
       - ./sabnzbd:/config
@@ -65,7 +65,7 @@ services:
     hostname: seerr
     image: ghcr.io/seerr-team/seerr:latest
     init: true
-    user: "1000:1000"
+    user: "1001:1001"
     ports:
       - "5055:5055"
     environment:

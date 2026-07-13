@@ -11,77 +11,64 @@ source "${REPO_ROOT}/lib/logging.sh"
 # shellcheck source=../lib/functions.sh
 source "${REPO_ROOT}/lib/functions.sh"
 
-install_media_packages() {
-    log_info "Installing NFS client support"
+readonly COMPOSE_SOURCE="${REPO_ROOT}/compose/media/compose.yaml"
 
-    apt-get update
-    apt_install nfs-common
+MEDIA_ROOT=""
+COMPOSE_TARGET=""
+
+require_docker() {
+    command_exists docker || die "Docker is required. Run the docker module before media."
+    docker compose version >/dev/null 2>&1 ||
+        die "Docker Compose is required. Run the docker module before media."
 }
 
-create_plex_group() {
-    local existing_group
+install_media_stack() {
+    local service
 
-    if getent group "${PLEX_GID}" >/dev/null 2>&1; then
-        existing_group="$(getent group "${PLEX_GID}" | cut -d: -f1)"
+    [[ -f "${COMPOSE_SOURCE}" ]] ||
+        die "Media Compose file is missing: ${COMPOSE_SOURCE}"
 
-        [[ "${existing_group}" == "plex" ]] ||
-            die "GID ${PLEX_GID} belongs to ${existing_group}, not plex"
+    log_info "Installing media Compose stack in ${MEDIA_ROOT}"
 
-        return
-    fi
+    install -d -m 0750 "${MEDIA_ROOT}"
+    install -d -m 0750 "${MEDIA_ROOT}/config"
 
-    groupadd --gid "${PLEX_GID}" plex
+    for service in sonarr radarr prowlarr sabnzbd seerr; do
+        install -d -m 0750 -o 1000 -g 1000 "${MEDIA_ROOT}/config/${service}"
+    done
+
+    install -m 0640 "${COMPOSE_SOURCE}" "${COMPOSE_TARGET}"
+
+    docker compose -f "${COMPOSE_TARGET}" pull
+    docker compose -f "${COMPOSE_TARGET}" up -d
 }
 
-create_plex_user() {
-    local existing_user
+verify_media_stack() {
+    local service
 
-    if getent passwd "${PLEX_UID}" >/dev/null 2>&1; then
-        existing_user="$(getent passwd "${PLEX_UID}" | cut -d: -f1)"
+    log_info "Verifying media containers"
 
-        [[ "${existing_user}" == "plex" ]] ||
-            die "UID ${PLEX_UID} belongs to ${existing_user}, not plex"
+    docker compose -f "${COMPOSE_TARGET}" ps
 
-        return
-    fi
-
-    useradd \
-        --uid "${PLEX_UID}" \
-        --gid "${PLEX_GID}" \
-        --no-create-home \
-        --shell /usr/sbin/nologin \
-        plex
-}
-
-create_media_directories() {
-    log_info "Creating media mount directory"
-
-    install -d \
-        -m 0775 \
-        -o plex \
-        -g plex \
-        /mnt/media
-}
-
-verify_media_identity() {
-    log_info "Verifying Plex identity"
-
-    id plex
-    getent passwd "${PLEX_UID}"
-    getent group "${PLEX_GID}"
+    for service in sonarr radarr prowlarr sabnzbd seerr; do
+        docker compose -f "${COMPOSE_TARGET}" ps --status running --services |
+            grep -qx "${service}" ||
+            die "Media container is not running: ${service}"
+    done
 }
 
 main() {
     require_root
     load_config "${REPO_ROOT}"
 
+    MEDIA_ROOT="${DOCKER_ROOT}/media"
+    COMPOSE_TARGET="${MEDIA_ROOT}/compose.yaml"
+
     log_info "Starting media bootstrap"
 
-    install_media_packages
-    create_plex_group
-    create_plex_user
-    create_media_directories
-    verify_media_identity
+    require_docker
+    install_media_stack
+    verify_media_stack
 
     log_info "Media bootstrap complete"
 }

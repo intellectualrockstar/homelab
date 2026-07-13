@@ -31,10 +31,9 @@ install_media_stack() {
     log_info "Installing media Compose stack in ${MEDIA_ROOT}"
 
     install -d -m 0750 "${MEDIA_ROOT}"
-    install -d -m 0750 "${MEDIA_ROOT}/config"
 
     for service in sonarr radarr prowlarr sabnzbd seerr; do
-        install -d -m 0750 -o 1000 -g 1000 "${MEDIA_ROOT}/config/${service}"
+        install -d -m 0750 -o 1000 -g 1000 "${MEDIA_ROOT}/${service}"
     done
 
     install -m 0640 "${COMPOSE_SOURCE}" "${COMPOSE_TARGET}"

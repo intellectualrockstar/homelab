@@ -63,7 +63,7 @@ The updater validates the stack name, updates Ubuntu packages, pulls current ima
 - **Plex:** host-networked media server with read-only NFS media
 - **Nginx Proxy Manager:** reverse proxy and certificate management
 - **Technitium:** DNS and DHCP using host networking
-- **Backrest + Restic REST Server:** backup administration and NFS-backed repository storage
+- **Backrest + Restic REST Server:** backup administration and NFS-backed repository storage (Work in Progress)
 
 ## Design principles
 

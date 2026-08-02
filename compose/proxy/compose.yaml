@@ -13,7 +13,18 @@ services:
       - npm_data:/data
       - npm_letsencrypt:/etc/letsencrypt
     restart: unless-stopped
-
+  homarr:
+    container_name: homarr
+    hostname: homarr
+    image: ghcr.io/homarr-labs/homarr:latest
+    ports:
+      - "7575:7575"
+    environment:
+      TZ: America/New_York
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY}
+    volumes:
+      - ./homarr:/appdata
+    restart: unless-stopped
 volumes:
   npm_data:
     name: npm_data

@@ -26,6 +26,16 @@ secrets/
 **/secrets/
 credentials.json
 config.local.*
+deploy_key
+**/deploy_key
+*_deploy_key
+.htpasswd
+*.htpasswd
+*.tfvars
+*.tfvars.json
+.aws/
+**/.aws/
+kubeconfig
 
 # Logs
 *.log
@@ -49,10 +59,30 @@ id_ed25519*
 id_ecdsa*
 id_dsa*
 
+# Databases, exports, backups, and archives
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.backup
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+backup/
+backups/
+**/backup/
+**/backups/
+
 # Generated infrastructure and runtime state
 *.tfplan
 cloud-init-*.yaml
 cloud-init-*.yml
+homelab-vm-*.yaml
 docker-compose.override.yml
 docker-compose.override.yaml
 compose.override.yml
@@ -61,6 +91,8 @@ compose.override.yaml
 **/config/config.json
 **/cache/
 **/data/
+**/appdata/
+**/homarr/
 
 # Python
 __pycache__/

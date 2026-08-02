@@ -2,44 +2,93 @@
 
 **Audit date:** 2026-08-01
 
-**Audited revision:** `6e7ef24bab0d16137486b177d8c05b7cb849880a`
+**Remote `main` baseline audited:** `d80ae07730d117d2ad18241995bed9c083ac4ad6`
 
-**Verdict:** **Not yet recommended for public release. Keep the repository private until the medium-severity Restic finding is remediated or explicitly accepted.**
+**Verdict:** **SAFE TO REMAIN PUBLIC.**
 
-No live passwords, API keys, access tokens, private keys, password hashes, TLS private keys, Plex claims/tokens, provider credentials, or public IP addresses were found in the current tracked tree or reachable Git history. No credential rotation or history purge is indicated by the evidence reviewed.
+No usable passwords, API keys, access tokens, API secrets, Plex tokens or claims,
+Homarr encryption keys, Proxmox tokens, Nginx Proxy Manager credentials, provider
+or DDNS credentials, private SSH or TLS keys, password hashes, cloud-init secrets,
+runtime `.env` files, databases, configuration exports, or backup archives were
+found in the current tracked tree or reachable Git history.
+
+No credential rotation or Git history rewrite is indicated by the evidence
+reviewed. This audit record and the accompanying `.gitignore` hardening are also
+within the reviewed release tree; the final published commit was rescanned after
+creation.
+
+## Accepted-risk scope
+
+The following deliberately are not release blockers or remediation findings:
+
+- RFC1918/private IP addresses, internal topology, internal domains, service
+  ports, NFS paths, storage layout, usernames, timezone, and naming conventions;
+- the unauthenticated Restic REST server in `compose/restic/compose.yaml`, because
+  the service is not configured for use, its network is firewalled, and Charles
+  explicitly accepts the current state;
+- Charles's name, public GitHub identity, and commit attribution metadata.
+
+These decisions accept disclosure and operational risk; they do not imply that
+private addressing or a firewall replaces authentication for a production-ready
+backup service.
 
 ## Findings
 
-| Severity | Location | Finding and impact | Recommended remediation |
-| --- | --- | --- | --- |
-| Medium | `compose/restic/compose.yaml:31` | The Restic REST server sets `DISABLE_AUTHENTICATION: "true"`. It is bound to an RFC1918 address, but any host able to reach that network can access the service; publishing the configuration also advertises this trust assumption. | Enable authentication before publication, store credentials outside Git, and confirm firewall/VLAN policy restricts port 8000. If unauthenticated access is intentional, document and formally accept the risk. |
-| Low | `compose/media/compose.yaml`, `compose/plex/compose.yaml`, `compose/restic/compose.yaml` | Current files reveal RFC1918 addresses (`192.168.10.8`, `192.168.51.25`), NFS export names, service ports, and storage layout. These are not Internet-routable and are not credentials, but they provide a useful internal topology map. | Parameterize or replace these values before publication if topology privacy matters. Test any change against the deployment workflow; do not assume hiding RFC1918 addresses is a security control. |
-| Low | Git history, including `fb8414c`, `2587382`, and `9f7e0dc` | Earlier revisions additionally reveal former service addresses (`192.168.51.15`, `192.168.10.25`) and the same NFS paths. Removing them only from the current tree would not remove them from public history. | Accept the historical topology disclosure or rewrite history before publication. No rewrite is required for credential safety based on this audit. |
-| Informational | Git commit metadata, including `0b1717c`, `b1a8141`, and `5976b58` | Charles Johnson's name and `charles@intellectualrockstar.com` appear as author metadata. GitHub noreply addresses also appear. This is personally identifying information, not a secret. | Confirm the attribution and email exposure are intentional. If not, rewrite author metadata before publication and use a noreply address for future commits. |
-| Informational | `config/defaults.conf`, `proxmox/newvm.sh`, `CONTRIBUTORS.md` | The admin username `charles`, GitHub account/repository, timezone, UID/GID conventions, Proxmox template/storage defaults, and deploy-key filesystem locations are disclosed. They do not grant access, but they fingerprint the environment. | Keep what is useful documentation; parameterize or generalize only the details Charles does not want associated with the public project. |
-| Informational | `proxmox/newvm.sh` | Generated VMs grant the admin account passwordless sudo. Password SSH login is disabled and the recovery password is prompted for and hashed transiently, so no password was found in Git. This is an operational hardening choice rather than a release secret. | Confirm this trust model is intentional; consider narrower sudo policy for higher-security environments. |
+### Release blockers
 
-## History review
+None.
 
-The review covered all tracked files and all reachable commits and blobs on every cloned ref. It included searches for:
+### Non-blocking observations
+
+- `compose/proxy/compose.yaml` references Homarr's key as
+  `${SECRET_ENCRYPTION_KEY}`. The tracked `compose/proxy/.env.example` contains
+  only `SECRET_ENCRYPTION_KEY=CHANGE_ME`; no real Homarr key appears in the commit
+  that added the service or elsewhere in reachable history.
+- Runtime `.env` files are ignored while `.env.example` templates remain
+  trackable. Ignore coverage also includes common secret files, deploy keys,
+  private-key formats, password files, Terraform variable files, generated
+  cloud-init snippets, runtime application data, databases, exports, backups,
+  and archives.
+- The historical `compose/restic/.env.example` contains only explicit
+  `CHANGE_ME_*` placeholders. It does not contain working credentials.
+- `proxmox/newvm.sh` reads a deploy key and a console recovery password at
+  runtime. The key is not embedded in the repository, and the generated password
+  hash is not committed.
+
+## Review performed
+
+The review covered every tracked file and every reachable commit and blob on all
+cloned refs, including the compose and documentation changes made on 2026-08-01.
+It included checks for:
 
 - private-key and certificate-key headers;
-- common GitHub, AWS, Cloudflare, Slack, Stripe, Plex, DDNS, and generic token formats;
-- password, secret, credential, token, API-key, and encryption-key assignments;
-- email addresses, domain names, IPv4 addresses, cloud-init password material, and deleted sensitive filenames;
-- unreachable objects reported by `git fsck` (none were reported).
+- GitHub, AWS, Cloudflare, Slack, Stripe, Plex, DDNS, and generic credential
+  formats;
+- password, secret, token, credential, API-key, and encryption-key assignments;
+- cloud-init password material and deleted sensitive filenames;
+- `.env` files, databases, dumps, exported configuration, backups, and archives;
+- accidentally pasted credentials or terminal output in README, audit, example,
+  and documentation files.
 
-The deleted historical `compose/restic/.env.example` contained only explicit `CHANGE_ME_*` placeholders, not working credentials. Dedicated tools such as Gitleaks, TruffleHog, and detect-secrets were not installed, so this was a manual and pattern-based review rather than a guarantee that no arbitrary high-entropy secret exists. A fresh automated scan is recommended immediately before changing repository visibility.
+Gitleaks 8.30.1 reported zero findings against both the working tree and full Git
+history. Manual pattern and diff review also reported no usable credentials.
+`git fsck --full --no-reflogs --unreachable` reported no unreachable objects in
+the fresh clone.
 
 ## Release checklist
 
-- [ ] Require authentication for the Restic REST server, or explicitly accept and document the network trust boundary.
-- [ ] Decide whether current and historical private topology details are acceptable in public.
-- [ ] Confirm Charles's name, email address, GitHub identity, username, and timezone may be public.
-- [ ] Run an automated history-aware secret scanner when available.
-- [ ] Re-audit the final commit immediately before changing visibility.
-- [ ] Keep the GitHub repository private until the blocker above is resolved.
+- [x] Review the latest remote `main` tree.
+- [x] Review all reachable Git history and deleted files.
+- [x] Confirm Homarr uses an environment-variable reference, not a committed key.
+- [x] Confirm runtime `.env` files and common secret/state artifacts are ignored.
+- [x] Review today's README, audit, example, and compose changes.
+- [x] Record the accepted private-network and Restic risk decisions.
+- [x] Run an automated history-aware secret scan.
+- [x] Rescan the final release commit before push.
 
-## Scope note
+## Scope boundary
 
-This audit covers repository contents and Git history only. It does not validate GitHub Actions variables, deploy keys, branch settings, releases, issues, pull requests, container images, the live Proxmox host, firewall rules, or external secret stores.
+This audit covers repository contents and Git history. It does not inspect GitHub
+Actions secrets, deploy keys stored in GitHub, branch settings, releases, issues,
+pull requests, container images, the live Proxmox host, firewall enforcement, or
+external secret stores.

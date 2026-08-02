@@ -3,28 +3,64 @@
 
 # VS Code
 .vscode/
+.idea/
 
 # Terraform
 *.tfstate
 *.tfstate.*
 .terraform/
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
-# Environment files
+# Environment files and local secrets
 .env
 .env.*
+!.env.example
+!**/.env.example
+*.secret
+*.secrets
+secrets/
+**/secrets/
+credentials.json
+config.local.*
 
 # Logs
 *.log
+logs/
 
 # Temporary files
 *.tmp
 *.bak
+*.swp
+*.swo
+*~
 
-# SSH Keys
+# Private keys and certificate bundles
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
 id_rsa*
 id_ed25519*
+id_ecdsa*
+id_dsa*
+
+# Generated infrastructure and runtime state
+*.tfplan
+cloud-init-*.yaml
+cloud-init-*.yml
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yml
+compose.override.yaml
+**/.terraform/
+**/config/config.json
+**/cache/
+**/data/
 
 # Python
 __pycache__/

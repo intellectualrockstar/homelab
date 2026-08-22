@@ -516,6 +516,7 @@ select_modules() {
         "Common always runs. Select optional add-ons:" \
         "docker" "Install Docker Engine and Docker Compose" OFF \
         "media" "Install Docker plus media/NFS configuration" OFF \
+        "plex" "Install Docker plus Plex and NFS startup recovery" OFF \
         "technitium" "Install Technitium DNS and DHCP Server" OFF
     )"
 
@@ -525,6 +526,10 @@ select_modules() {
 
     if grep -qw 'media' <<<"${selections}"; then
         SELECTED_MODULES+=("media")
+    fi
+
+    if grep -qw 'plex' <<<"${selections}"; then
+        SELECTED_MODULES+=("plex")
     fi
 
     if grep -qw 'technitium' <<<"${selections}"; then

@@ -38,6 +38,10 @@ resolve_modules() {
                 append_module "docker"
                 append_module "media"
                 ;;
+            plex)
+                append_module "docker"
+                append_module "plex"
+                ;;
             technitium)
                 append_module "docker"
                 append_module "technitium"

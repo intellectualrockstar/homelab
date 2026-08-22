@@ -65,6 +65,20 @@ The updater validates the stack name, updates Ubuntu packages, pulls current ima
 - **Technitium:** DNS and DHCP using host networking
 - **Backrest + Restic REST Server:** backup administration and NFS-backed repository storage (Work in Progress)
 
+### Plex NFS startup recovery
+
+TrueNAS can answer ping before its NFS service is ready. On boot, Docker may therefore try to restore Plex too early and report `no route to host` while mounting the media volume. The Plex role installs [`plex-startup.service`](compose/plex/plex-startup.service), which waits for the actual NFS endpoint at `192.168.10.8:2049` and then retries `docker start plex`. Compose remains the primary lifecycle manager with `restart: unless-stopped`.
+
+For an existing Plex VM, install and enable the helper manually:
+
+```bash
+sudo install -m 0644 compose/plex/plex-startup.service /etc/systemd/system/plex-startup.service
+sudo systemctl daemon-reload
+sudo systemctl enable plex-startup.service
+```
+
+The command is safe to repeat. New VMs provisioned with the Plex role receive the unit automatically.
+
 ## Design principles
 
 - **Repeatable by default.** Rebuilding should be less exciting than troubleshooting.

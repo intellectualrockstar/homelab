@@ -1,0 +1,14 @@
+[Unit]
+Description=Start Plex after TrueNAS NFS is available
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/bash -c 'until timeout 3 bash -c "</dev/tcp/192.168.10.8/2049" 2>/dev/null; do echo "Waiting for TrueNAS NFS..."; sleep 2; done'
+ExecStart=/usr/bin/docker start plex
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

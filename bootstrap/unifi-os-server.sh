@@ -30,7 +30,8 @@ install_unifi_prerequisites() {
     apt-get update
     apt_install \
         podman \
-        slirp4netns
+        slirp4netns \
+        uidmap
 }
 
 verify_unifi_prerequisites() {

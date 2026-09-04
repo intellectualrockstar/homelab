@@ -37,6 +37,14 @@ On a configured Proxmox host, launch the interactive VM builder:
 sudo ./proxmox/newvm.sh
 ```
 
+### UniFi OS Server VM
+
+Select **unifi-os-server** in the bootstrap add-ons list. For the planned deployment, use VMID `113`, 4 CPU cores, 8 GB RAM, the existing disk default, the normal server network/VLAN, and DHCP so the existing MAC reservation supplies `192.168.51.13`.
+
+The role applies the common Ubuntu baseline and installs Ubiquiti's supported Linux prerequisites (`podman` and `slirp4netns`). It intentionally does not install legacy UniFi Network Server or create a Docker/Podman Compose deployment. After first boot, copy the current Linux x64 UniFi OS Server installer link from the [official download page](https://ui.com/download/releases/unifi-os-server), then follow the command printed in `/var/log/homelab-bootstrap.log` to run Ubiquiti's host installer.
+
+Complete the interactive setup, then restore the July 11 UniFi backup through UniFi's setup/migration UI. Keep the backup itself outside this repository.
+
 On a deployed Docker VM, update a stack and its host:
 
 ```bash

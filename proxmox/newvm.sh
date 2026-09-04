@@ -517,7 +517,8 @@ select_modules() {
         "docker" "Install Docker Engine and Docker Compose" OFF \
         "media" "Install Docker plus media/NFS configuration" OFF \
         "plex" "Install Docker plus Plex and NFS startup recovery" OFF \
-        "technitium" "Install Technitium DNS and DHCP Server" OFF
+        "technitium" "Install Technitium DNS and DHCP Server" OFF \
+        "unifi-os-server" "Prepare the official UniFi OS Server host" OFF
     )"
 
     if grep -qw 'docker' <<<"${selections}"; then
@@ -534,6 +535,10 @@ select_modules() {
 
     if grep -qw 'technitium' <<<"${selections}"; then
         SELECTED_MODULES+=("technitium")
+    fi
+
+    if grep -qw 'unifi-os-server' <<<"${selections}"; then
+        SELECTED_MODULES+=("unifi-os-server")
     fi
 }
 

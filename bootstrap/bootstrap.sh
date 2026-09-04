@@ -46,6 +46,9 @@ resolve_modules() {
                 append_module "docker"
                 append_module "technitium"
                 ;;
+            unifi-os-server)
+                append_module "unifi-os-server"
+                ;;
             *)
                 die "Unknown module: ${requested_module}"
                 ;;

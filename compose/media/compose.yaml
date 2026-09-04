@@ -31,6 +31,21 @@ services:
       - media-library:/mnt/MediaLibrary
     restart: unless-stopped
 
+  bazarr:
+    container_name: bazarr
+    hostname: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    ports:
+      - "6767:6767"
+    environment:
+      PUID: "1001"
+      PGID: "1001"
+      TZ: America/New_York
+    volumes:
+      - ./bazarr:/config
+      - media-library:/mnt/MediaLibrary
+    restart: unless-stopped
+
   prowlarr:
     container_name: prowlarr
     hostname: prowlarr

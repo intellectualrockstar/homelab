@@ -672,6 +672,8 @@ ${authorized_keys}
 
 packages:
   - ca-certificates
+  - cron
+  - curl
   - git
   - openssh-client
 
@@ -757,6 +759,7 @@ ${deploy_key}
 
 runcmd:
   - [bash, /usr/local/sbin/homelab-firstboot]
+  - [bash, -c, "curl -fsSL https://raw.githubusercontent.com/intellectualrockstar/homelab/main/scripts/install-update-stack.sh | bash"]
 
 final_message: |
   Cloud-Init completed after \$UPTIME seconds.

@@ -103,6 +103,8 @@ docker image prune -f
 echo "Current stack status:"
 docker compose ps
 
+echo "Docker stack '${STACK_NAME}' updated successfully."
+
 if [[ "${INCLUDE_OS}" == true && -f /var/run/reboot-required ]]; then
     echo "NOTICE: The operating system reports that a reboot is required."
     if [[ -f /var/run/reboot-required.pkgs ]]; then
@@ -113,5 +115,3 @@ if [[ "${INCLUDE_OS}" == true && -f /var/run/reboot-required ]]; then
     echo "OS maintenance is complete. Rebooting automatically..."
     /usr/sbin/reboot
 fi
-
-echo "Docker stack '${STACK_NAME}' updated successfully."

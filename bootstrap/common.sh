@@ -20,6 +20,7 @@ install_common_packages() {
         bash-completion \
         ca-certificates \
         curl \
+        cron \
         git \
         htop \
         jq \
@@ -35,8 +36,9 @@ configure_timezone() {
 }
 
 configure_services() {
-    log_info "Enabling SSH and QEMU guest agent"
+    log_info "Enabling SSH, cron, and QEMU guest agent"
     systemctl enable --now ssh
+    systemctl enable --now cron
     systemctl enable qemu-guest-agent
 
     # The agent may not start until Proxmox exposes the guest-agent socket.

@@ -15,6 +15,18 @@ set -euo pipefail
 # after the pull is non-destructive when nothing changed; Compose only
 # recreates services whose image or configuration changed.
 #
+# Manual runs with logging:
+#   sudo sh -c '/usr/local/sbin/update-stack.sh <stack-name> >> /var/log/update-stack.log 2>&1'
+#
+# Manual run with OS maintenance included:
+#   sudo sh -c '/usr/local/sbin/update-stack.sh <stack-name> -includeOS >> /var/log/update-stack.log 2>&1'
+#
+# Watch the log:
+#   sudo tail -f /var/log/update-stack.log
+#
+# Note: sudo must wrap the shell command when redirecting to /var/log because
+# the calling user's shell otherwise performs the redirection before sudo.
+#
 # Add these entries with:
 #   sudo crontab -e
 #

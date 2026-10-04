@@ -21,7 +21,9 @@ set -euo pipefail
 # Run container updates at 4:00 AM Sunday-Friday:
 #   0 4 * * 0-5 /usr/local/sbin/update-stack.sh <stack-name> >> /var/log/update-stack.log 2>&1
 #
-# Run the Saturday 4:00 AM update with OS package maintenance included:
+# Run the Saturday 4:00 AM update with OS package maintenance included.
+# If Ubuntu reports that a reboot is required after the OS update, this run
+# automatically reboots the VM after container maintenance is complete:
 #   0 4 * * 6 /usr/local/sbin/update-stack.sh <stack-name> -includeOS >> /var/log/update-stack.log 2>&1
 #
 # Replace <stack-name> with the stack on that VM, for example:
@@ -107,6 +109,9 @@ if [[ "${INCLUDE_OS}" == true && -f /var/run/reboot-required ]]; then
         echo "Packages requesting the reboot:"
         cat /var/run/reboot-required.pkgs
     fi
+
+    echo "OS maintenance is complete. Rebooting automatically..."
+    /usr/sbin/reboot
 fi
 
 echo "Docker stack '${STACK_NAME}' updated successfully."
